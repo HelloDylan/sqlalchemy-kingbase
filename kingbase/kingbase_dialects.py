@@ -87,7 +87,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
     def get_schema_names(self, connection, **kw):
         result = connection.execute(
             sql.text(
-                "SELECT nspname FROM sys_namespace "
+                "SELECT nspname FROM sys_catalog.sys_namespace "
                 "WHERE nspname NOT LIKE 'sys_%' "
                 "ORDER BY nspname"
             ).columns(nspname=sqltypes.Unicode)
@@ -98,8 +98,8 @@ class PGDialect_kingbase(PGDialect_psycopg2):
     def get_table_names(self, connection, schema=None, **kw):
         result = connection.execute(
             sql.text(
-                "SELECT c.relname FROM sys_class c "
-                "JOIN sys_namespace n ON n.oid = c.relnamespace "
+                "SELECT c.relname FROM sys_catalog.sys_class c "
+                "JOIN sys_catalog.sys_namespace n ON n.oid = c.relnamespace "
                 "WHERE n.nspname = :schema AND c.relkind in ('r', 'p')"
             ).columns(relname=sqltypes.Unicode),
             schema=schema if schema is not None else self.default_schema_name,
@@ -110,8 +110,8 @@ class PGDialect_kingbase(PGDialect_psycopg2):
     def _get_foreign_table_names(self, connection, schema=None, **kw):
         result = connection.execute(
             sql.text(
-                "SELECT c.relname FROM sys_class c "
-                "JOIN sys_namespace n ON n.oid = c.relnamespace "
+                "SELECT c.relname FROM sys_catalog.sys_class c "
+                "JOIN sys_catalog.sys_namespace n ON n.oid = c.relnamespace "
                 "WHERE n.nspname = :schema AND c.relkind = 'f'"
             ).columns(relname=sqltypes.Unicode),
             schema=schema if schema is not None else self.default_schema_name,
@@ -139,8 +139,8 @@ class PGDialect_kingbase(PGDialect_psycopg2):
 
         result = connection.execute(
             sql.text(
-                "SELECT c.relname FROM sys_class c "
-                "JOIN sys_namespace n ON n.oid = c.relnamespace "
+                "SELECT c.relname FROM sys_catalog.sys_class c "
+                "JOIN sys_catalog.sys_namespace n ON n.oid = c.relnamespace "
                 "WHERE n.nspname = :schema AND c.relkind IN (%s)"
                 % (", ".join("'%s'" % elem for elem in kinds))
             ).columns(relname=sqltypes.Unicode),
@@ -152,8 +152,8 @@ class PGDialect_kingbase(PGDialect_psycopg2):
     def get_view_definition(self, connection, view_name, schema=None, **kw):
         view_def = connection.scalar(
             sql.text(
-                "SELECT sys_get_viewdef(c.oid) view_def FROM sys_class c "
-                "JOIN sys_namespace n ON n.oid = c.relnamespace "
+                "SELECT sys_catalog.sys_get_viewdef(c.oid) view_def FROM sys_catalog.sys_class c "
+                "JOIN sys_catalog.sys_namespace n ON n.oid = c.relnamespace "
                 "WHERE n.nspname = :schema AND c.relname = :view_name "
                 "AND c.relkind IN ('v', 'm')"
             ).columns(view_def=sqltypes.Unicode),
@@ -233,7 +233,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
 
     def do_recover_twophase(self, connection):
         resultset = connection.execute(
-            sql.text("SELECT gid FROM sys_prepared_xacts")
+            sql.text("SELECT gid FROM sys_catalog.sys_prepared_xacts")
         )
         return [row[0] for row in resultset]
 
@@ -242,7 +242,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
 
     def has_schema(self, connection, schema):
         query = (
-            "select nspname from sys_namespace " "where lower(nspname)=:schema"
+            "select nspname from sys_catalog.sys_namespace " "where lower(nspname)=:schema"
         )
         cursor = connection.execute(
             sql.text(query).bindparams(
@@ -261,7 +261,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
         if schema is None:
             cursor = connection.execute(
                 sql.text(
-                    "select relname from sys_class c join sys_namespace n on "
+                    "select relname from sys_catalog.sys_class c join sys_catalog.sys_namespace n on "
                     "n.oid=c.relnamespace where "
                     "sys_catalog.sys_table_is_visible(c.oid) "
                     "and relname=:name"
@@ -276,7 +276,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
         else:
             cursor = connection.execute(
                 sql.text(
-                    "select relname from sys_class c join sys_namespace n on "
+                    "select relname from sys_catalog.sys_class c join sys_catalog.sys_namespace n on "
                     "n.oid=c.relnamespace where n.nspname=:schema and "
                     "relname=:name"
                 ).bindparams(
@@ -298,7 +298,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
         if schema is None:
             cursor = connection.execute(
                 sql.text(
-                    "SELECT relname FROM sys_class c join sys_namespace n on "
+                    "SELECT relname FROM sys_catalog.sys_class c join sys_catalog.sys_namespace n on "
                     "n.oid=c.relnamespace where relkind='S' and "
                     "n.nspname=current_schema() "
                     "and relname=:name"
@@ -313,7 +313,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
         else:
             cursor = connection.execute(
                 sql.text(
-                    "SELECT relname FROM sys_class c join sys_namespace n on "
+                    "SELECT relname FROM sys_catalog.sys_class c join sys_catalog.sys_namespace n on "
                     "n.oid=c.relnamespace where relkind='S' and "
                     "n.nspname=:schema and relname=:name"
                 ).bindparams(
@@ -348,7 +348,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
             SELECT EXISTS (
                 SELECT * FROM sys_catalog.sys_type t
                 WHERE t.typname = :typname
-                AND sys_type_is_visible(t.oid)
+                AND sys_catalog.sys_type_is_visible(t.oid)
                 )
                 """
             query = sql.text(query)
@@ -376,9 +376,9 @@ class PGDialect_kingbase(PGDialect_psycopg2):
             PK_SQL = """
                 SELECT a.attname
                 FROM
-                    sys_class t
-                    join sys_index ix on t.oid = ix.indrelid
-                    join sys_attribute a
+                    sys_catalog.sys_class t
+                    join sys_catalog.sys_index ix on t.oid = ix.indrelid
+                    join sys_catalog.sys_attribute a
                         on t.oid=a.attrelid AND %s
                  WHERE
                   t.oid = :table_oid and ix.indisprimary = 't'
@@ -392,10 +392,10 @@ class PGDialect_kingbase(PGDialect_psycopg2):
             # version 8.4
             PK_SQL = """
                 SELECT a.attname
-                FROM sys_attribute a JOIN (
+                FROM sys_catalog.sys_attribute a JOIN (
                     SELECT unnest(ix.indkey) attnum,
                            generate_subscripts(ix.indkey, 1) ord
-                    FROM sys_index ix
+                    FROM sys_catalog.sys_index ix
                     WHERE ix.indrelid = :table_oid AND ix.indisprimary
                     ) k ON a.attnum=k.attnum
                 WHERE a.attrelid = :table_oid
@@ -436,8 +436,8 @@ class PGDialect_kingbase(PGDialect_psycopg2):
                 sys_catalog.sys_get_constraintdef(r.oid, true) as condef,
                 n.nspname as conschema
           FROM  sys_catalog.sys_constraint r,
-                sys_namespace n,
-                sys_class c
+                sys_catalog.sys_namespace n,
+                sys_catalog.sys_class c
 
           WHERE r.conrelid = :table AND
                 r.contype = 'f' AND
@@ -544,14 +544,14 @@ class PGDialect_kingbase(PGDialect_psycopg2):
                   a.attname, a.attnum, NULL, ix.indkey%s,
                   %s, am.amname
               FROM
-                  sys_class t
-                        join sys_index ix on t.oid = ix.indrelid
-                        join sys_class i on i.oid = ix.indexrelid
+                  sys_catalog.sys_class t
+                        join sys_catalog.sys_index ix on t.oid = ix.indrelid
+                        join sys_catalog.sys_class i on i.oid = ix.indexrelid
                         left outer join
-                            sys_attribute a
+                            sys_catalog.sys_attribute a
                             on t.oid = a.attrelid and %s
                         left outer join
-                            sys_am am
+                            sys_catalog.sys_am am
                             on i.relam = am.oid
               WHERE
                   t.relkind IN ('r', 'v', 'f', 'm')
@@ -578,19 +578,19 @@ class PGDialect_kingbase(PGDialect_psycopg2):
                   a.attname, a.attnum, c.conrelid, ix.indkey::varchar,
                   i.reloptions, am.amname
               FROM
-                  sys_class t
-                        join sys_index ix on t.oid = ix.indrelid
-                        join sys_class i on i.oid = ix.indexrelid
+                  sys_catalog.sys_class t
+                        join sys_catalog.sys_index ix on t.oid = ix.indrelid
+                        join sys_catalog.sys_class i on i.oid = ix.indexrelid
                         left outer join
-                            sys_attribute a
+                            sys_catalog.sys_attribute a
                             on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)
                         left outer join
-                            sys_constraint c
+                            sys_catalog.sys_constraint c
                             on (ix.indrelid = c.conrelid and
                                 ix.indexrelid = c.conindid and
                                 c.contype in ('p', 'u', 'x'))
                         left outer join
-                            sys_am am
+                            sys_catalog.sys_am am
                             on i.relam = am.oid
               WHERE
                   t.relkind IN ('r', 'v', 'f', 'm')
@@ -696,7 +696,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
                 a.attname as col_name
             FROM
                 sys_catalog.sys_constraint cons
-                join sys_attribute a
+                join sys_catalog.sys_attribute a
                   on cons.conrelid = a.attrelid AND
                     a.attnum = ANY(cons.conkey)
             WHERE
@@ -746,7 +746,7 @@ class PGDialect_kingbase(PGDialect_psycopg2):
         CHECK_SQL = """
             SELECT
                 cons.conname as name,
-                sys_get_constraintdef(cons.oid) as src
+                sys_catalog.sys_get_constraintdef(cons.oid) as src
             FROM
                 sys_catalog.sys_constraint cons
             WHERE

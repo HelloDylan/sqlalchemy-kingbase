@@ -29,7 +29,7 @@ class HstoreAdapter(extras.HstoreAdapter):
         # get the oid for the hstore
         curs.execute("""\
     SELECT t.oid, %s
-    FROM sys_type t JOIN sys_namespace ns
+    FROM sys_catalog.sys_type t JOIN sys_catalog.sys_namespace ns
         ON typnamespace = ns.oid
     WHERE typname = 'hstore';
     """ % typarray)
